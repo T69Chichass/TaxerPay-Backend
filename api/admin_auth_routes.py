@@ -71,6 +71,9 @@ def login_admin():
         if not admin:
             return jsonify({'success': False, 'error': 'Admin not found'}), 404
         
+        if 'password' in admin:
+            del admin['password']
+        
         # Generate token
         token = auth_utils.generate_token(admin)
         
@@ -181,3 +184,57 @@ def get_all_farmers():
     except Exception as e:
         print(f"Get all farmers error: {e}")
         return jsonify({'error': 'Internal server error'}), 500
+
+@admin_auth_bp.route('/farmers/<farmer_id>/password', methods=['PUT'])
+def update_farmer_password(farmer_id):
+    """Update farmer password (admin only)"""
+    try:
+        # Get token from header
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return jsonify({'success': False, 'message': 'Authorization token required'}), 401
+        
+        token = auth_header.split(' ')[1]
+        
+        # Verify token and get admin
+        try:
+            payload = auth_utils.verify_token(token)
+            admin_id = payload.get('user_id')
+            admin = admin_model.get_admin_by_id(admin_id)
+            
+            if not admin:
+                return jsonify({'success': False, 'message': 'Invalid token'}), 401
+                
+        except Exception as e:
+            return jsonify({'success': False, 'message': 'Invalid token'}), 401
+        
+        # Get request data
+        data = request.get_json()
+        new_password = data.get('password')
+        
+        if not new_password:
+            return jsonify({'success': False, 'message': 'New password is required'}), 400
+        
+        # Update farmer password
+        from models.farmer import farmer_model
+        result = farmer_model.update_farmer_password(farmer_id, new_password)
+        
+        if result:
+            return jsonify({
+                'success': True,
+                'message': 'Password updated successfully'
+            }), 200
+        else:
+            return jsonify({'success': False, 'message': 'Farmer not found'}), 404
+        
+    except Exception as e:
+        print(f"Update farmer password error: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@admin_auth_bp.route('/exists', methods=['GET'])
+def admin_exists():
+    employee_id = request.args.get('employee_id', '').upper()
+    if not employee_id:
+        return jsonify({'exists': False, 'error': 'Employee ID is required'}), 400
+    admin = admin_model.get_admin_by_employee_id(employee_id)
+    return jsonify({'exists': bool(admin)})

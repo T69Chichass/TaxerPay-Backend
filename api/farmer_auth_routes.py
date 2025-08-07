@@ -146,3 +146,11 @@ def update_farmer_profile():
     except Exception as e:
         print(f"Update farmer profile error: {e}")
         return jsonify({'error': 'Internal server error'}), 500
+
+@farmer_auth_bp.route('/exists', methods=['GET'])
+def farmer_exists():
+    pan_card = request.args.get('pan_card', '').upper()
+    if not pan_card:
+        return jsonify({'exists': False, 'error': 'PAN card is required'}), 400
+    farmer = farmer_model.get_farmer_by_pan(pan_card)
+    return jsonify({'exists': bool(farmer)})

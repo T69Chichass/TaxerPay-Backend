@@ -35,12 +35,15 @@ class Farmer:
             print(f"Error creating farmer: {e}")
             raise
     
-    def get_farmer_by_pan(self, pan_card):
+    def get_farmer_by_pan(self, pan_card, include_password=False):
         """Get farmer by PAN card ID"""
         try:
             farmer = self.collection.find_one({'pan_card': pan_card.upper()})
             if farmer:
                 farmer['_id'] = str(farmer['_id'])
+                # Remove password unless specifically requested
+                if not include_password and 'password' in farmer:
+                    del farmer['password']
             return farmer
         except Exception as e:
             print(f"Error getting farmer by PAN: {e}")
@@ -73,9 +76,10 @@ class Farmer:
     def verify_password(self, pan_card, password):
         """Verify farmer password"""
         try:
-            farmer = self.get_farmer_by_pan(pan_card)
+            farmer = self.get_farmer_by_pan(pan_card, include_password=True)
             if farmer and farmer.get('password'):
                 stored_password = farmer['password']
+                # Convert stored password to bytes if it's a string
                 if isinstance(stored_password, str):
                     stored_password = stored_password.encode('utf-8')
                 return bcrypt.checkpw(password.encode('utf-8'), stored_password)
@@ -95,6 +99,24 @@ class Farmer:
         except Exception as e:
             print(f"Error getting all farmers: {e}")
             return []
+
+    def update_farmer_password(self, farmer_id, new_password):
+        """Update farmer password"""
+        try:
+            # Hash the new password
+            salt = bcrypt.gensalt()
+            hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), salt)
+            
+            # Update the farmer's password
+            result = self.collection.update_one(
+                {'_id': ObjectId(farmer_id)},
+                {'$set': {'password': hashed_password.decode('utf-8'), 'updated_at': datetime.utcnow()}}
+            )
+            
+            return result.modified_count > 0
+        except Exception as e:
+            print(f"Error updating farmer password: {e}")
+            return False
 
 # Create a global farmer model instance
 farmer_model = Farmer()
