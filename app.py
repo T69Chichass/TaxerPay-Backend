@@ -4,6 +4,8 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
 from api.auth_routes import auth_bp
+from api.farmer_auth_routes import farmer_auth_bp
+from api.admin_auth_routes import admin_auth_bp
 from api.tax_routes import tax_bp
 from config.database import db
 
@@ -16,6 +18,8 @@ CORS(app)  # Enable CORS for all routes
 
 # Register blueprints
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
+app.register_blueprint(farmer_auth_bp, url_prefix='/api/farmer')
+app.register_blueprint(admin_auth_bp, url_prefix='/api/admin')
 app.register_blueprint(tax_bp, url_prefix='/api/tax')
 
 # Configuration
@@ -36,9 +40,22 @@ def api_info():
     return jsonify({
         'name': 'TaxerPay API',
         'version': '1.0.0',
-        'description': 'Tax management and calculation API',
+        'description': 'Farmer Land Tax Management System',
         'endpoints': {
-            'auth': {
+            'farmer_auth': {
+                'register': 'POST /api/farmer/register',
+                'login': 'POST /api/farmer/login',
+                'profile': 'GET /api/farmer/profile',
+                'update_profile': 'PUT /api/farmer/profile'
+            },
+            'admin_auth': {
+                'register': 'POST /api/admin/register',
+                'login': 'POST /api/admin/login',
+                'profile': 'GET /api/admin/profile',
+                'update_profile': 'PUT /api/admin/profile',
+                'get_all_farmers': 'GET /api/admin/farmers'
+            },
+            'general_auth': {
                 'register': 'POST /api/auth/register',
                 'login': 'POST /api/auth/login',
                 'profile': 'GET /api/auth/profile',
@@ -53,6 +70,17 @@ def api_info():
                 'calculate_tax': 'POST /api/tax/calculate'
             }
         }
+    }), 200
+
+@app.route('/', methods=['GET'])
+def root():
+    """Root endpoint - redirect to API info"""
+    return jsonify({
+        'message': 'TaxerPay Backend is running!',
+        'status': 'healthy',
+        'api_docs': '/api',
+        'health_check': '/api/health',
+        'frontend': 'Start the frontend with: cd ../frontend && npm start'
     }), 200
 
 # Eel functions for frontend communication
@@ -119,6 +147,14 @@ def start_eel_app():
         # Check if build directory exists, otherwise use src
         if not os.path.exists(web_dir):
             web_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'frontend', 'src')
+        
+        # Check if index.html exists in the web directory
+        index_path = os.path.join(web_dir, 'index.html')
+        if not os.path.exists(index_path):
+            print(f"⚠️  index.html not found in {web_dir}")
+            print("🔄 Falling back to Flask-only mode...")
+            start_flask_only()
+            return
         
         # Initialize Eel
         eel.init(web_dir)
